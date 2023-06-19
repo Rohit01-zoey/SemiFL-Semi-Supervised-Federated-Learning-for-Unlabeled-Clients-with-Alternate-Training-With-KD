@@ -2,7 +2,7 @@ import math
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from .utils import init_param, make_batchnorm, loss_fn
+from .utils import init_param, make_batchnorm, loss_fn, kld_loss
 from config import cfg
 
 
@@ -92,6 +92,18 @@ class WideResNet(nn.Module):
                 mix_output = self.f(input['mix_data'])
                 output['loss'] += input['lam'] * loss_fn(mix_output, input['mix_target'][:, 0].detach()) + (
                         1 - input['lam']) * loss_fn(mix_output, input['mix_target'][:, 1].detach())
+                
+            elif input['loss_mode'] == 'kd':
+                output['loss'] = kld_loss(output['target'], input['target'])
+            elif input['loss_mode'] == 'kd-fix':
+                aug_output = self.f(input['aug'])
+                output['loss'] = kld_loss(aug_output, input['target'].detach())
+            elif input['loss_mode'] == 'kd-fix-mix':
+                aug_output = self.f(input['aug'])
+                output['loss'] = kld_loss(aug_output, input['target'].detach())
+                mix_output = self.f(input['mix_data'])
+                output['loss'] += input['lam'] * kld_loss(mix_output, input['mix_target'][:, 0].detach()) + (
+                        1 - input['lam']) * kld_loss(mix_output, input['mix_target'][:, 1].detach())
             else:
                 raise ValueError('Not valid loss mode')
         else:
