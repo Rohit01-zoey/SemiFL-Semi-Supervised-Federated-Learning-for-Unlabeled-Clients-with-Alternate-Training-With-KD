@@ -225,7 +225,7 @@ class Client:
     def make_dataset(self, dataset, metric, logger):
         if 'sup' in cfg['loss_mode']:
             return dataset
-        elif 'fix' in cfg['loss_mode']:
+        elif 'kd' not in cfg['loss_mode'] and 'fix' in cfg['loss_mode']:
             with torch.no_grad():
                 data_loader = make_data_loader({'train': dataset}, 'global', shuffle={'train': False})['train']
                 model = eval('models.{}(track=True).to(cfg["device"])'.format(cfg['model_name']))
@@ -289,14 +289,54 @@ class Client:
                 evaluation = metric.evaluate(['PAccuracy', 'MAccuracy', 'LabelRatio'], input_, output_)
                 logger.append(evaluation, 'train', n=len(input_['target']))
                 soft_dataset = copy.deepcopy(dataset)
-                soft_dataset.target = output_['target'].tolist()
+                soft_dataset.target = output_['target'].tolist() #! may be wrong
                 return soft_dataset
             
+        elif 'kd' in cfg['loss_mode'] and 'fix' in cfg['loss_mode']:
+            with torch.no_grad():
+                data_loader = make_data_loader({'train': dataset}, 'global', shuffle={'train': False})['train']
+                model = eval('models.{}(track=True).to(cfg["device"])'.format(cfg['model_name']))
+                model.load_state_dict(self.model_state_dict)
+                model.train(False)
+                output = []
+                target = []
+                for i, input in enumerate(data_loader):
+                    input = collate(input)
+                    input = to_device(input, cfg['device'])
+                    output_ = model(input)
+                    output_i = output_['target']
+                    target_i = input['target']
+                    output.append(output_i.cpu())
+                    target.append(target_i.cpu())
+                output_, input_ = {}, {}
+                output_['target'] = torch.cat(output, dim=0)
+                input_['target'] = torch.cat(target, dim=0)
+                output_['target'] = F.softmax(output_['target'], dim=-1)
+                _, mask = self.make_hard_pseudo_label(output_['target'])
+                output_['mask'] = mask
+                evaluation = metric.evaluate(['PAccuracy', 'MAccuracy', 'LabelRatio'], input_, output_)
+                logger.append(evaluation, 'train', n=len(input_['target']))
+                if torch.any(mask):
+                    soft_fix_dataset = copy.deepcopy(dataset)
+                    soft_fix_dataset.target = output_['target'].tolist() #! may be wrong
+                    mask = mask.tolist()
+                    soft_fix_dataset.data = list(compress(soft_fix_dataset.data, mask))
+                    soft_fix_dataset.target = list(compress(soft_fix_dataset.target, mask))
+                    soft_fix_dataset.other = {'id': list(range(len(soft_fix_dataset.data)))}
+                    if 'mix' in cfg['loss_mode']:
+                        soft_mix_dataset = copy.deepcopy(dataset)
+                        soft_mix_dataset.target = output_['target'].tolist() #! may be wrong
+                        soft_mix_dataset = MixDataset(len(soft_fix_dataset), soft_mix_dataset)
+                    else:
+                        soft_mix_dataset = None
+                    return soft_fix_dataset, soft_mix_dataset
+                else:
+                    return None
         else:
             raise ValueError('Not valid client loss mode')
 
     def train(self, dataset, lr, metric, logger):
-        if cfg['loss_mode'] == 'sup':
+        if cfg['loss_mode'] == 'sup' or cfg['loss_mode'] == 'kd': # * pure supervised learning or pure KD no mix/fix included here
             data_loader = make_data_loader({'train': dataset}, 'client')['train']
             model = eval('models.{}().to(cfg["device"])'.format(cfg['model_name']))
             model.load_state_dict(self.model_state_dict, strict=False)
