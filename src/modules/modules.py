@@ -265,6 +265,33 @@ class Client:
                     return fix_dataset, mix_dataset
                 else:
                     return None
+                
+        elif 'kd' in cfg['loss_mode'] and 'mix' not in cfg['loss_mode']:
+            with torch.no_grad():
+                data_loader = make_data_loader({'train': dataset}, 'global', shuffle={'train': False})['train']
+                model = eval('models.{}(track=True).to(cfg["device"])'.format(cfg['model_name']))
+                model.load_state_dict(self.model_state_dict)
+                model.train(False)
+                output = []
+                target = []
+                for i, input in enumerate(data_loader):
+                    input = collate(input)
+                    input = to_device(input, cfg['device'])
+                    output_ = model(input)
+                    output_i = output_['target']
+                    target_i = input['target']
+                    output.append(output_i.cpu())
+                    target.append(target_i.cpu())
+                output_, input_ = {}, {}
+                output_['target'] = torch.cat(output, dim=0)
+                input_['target'] = torch.cat(target, dim=0)
+                output_['target'] = F.softmax(output_['target'], dim=-1)
+                evaluation = metric.evaluate(['PAccuracy', 'MAccuracy', 'LabelRatio'], input_, output_)
+                logger.append(evaluation, 'train', n=len(input_['target']))
+                soft_dataset = copy.deepcopy(dataset)
+                soft_dataset.target = output_['target'].tolist()
+                return soft_dataset
+            
         else:
             raise ValueError('Not valid client loss mode')
 
