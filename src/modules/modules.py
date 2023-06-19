@@ -266,7 +266,7 @@ class Client:
                 else:
                     return None
                 
-        elif 'kd' in cfg['loss_mode'] and 'mix' not in cfg['loss_mode']:
+        elif 'kd' in cfg['loss_mode'] and 'fix' not in cfg['loss_mode']:
             with torch.no_grad():
                 data_loader = make_data_loader({'train': dataset}, 'global', shuffle={'train': False})['train']
                 model = eval('models.{}(track=True).to(cfg["device"])'.format(cfg['model_name']))
