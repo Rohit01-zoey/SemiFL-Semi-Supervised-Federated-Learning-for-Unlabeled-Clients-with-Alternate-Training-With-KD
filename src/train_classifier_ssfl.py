@@ -80,15 +80,18 @@ def runExperiment():
         server = make_server(model)
         client = make_client(model, data_split)
         logger = make_logger(os.path.join('output', 'runs', 'train_{}'.format(cfg['model_tag'])))
+    print('Start training clients')
     for epoch in range(last_epoch, cfg['global']['num_epochs'] + 1):
         train_client(batchnorm_dataset, client_dataset['train'], server, client, optimizer, metric, logger, epoch)
         if 'ft' in cfg and cfg['ft'] == 0:
+            print('Start training server')
             train_server(server_dataset['train'], server, optimizer, metric, logger, epoch)
             logger.reset()
             server.update_parallel(client)
         else:
             logger.reset()
             server.update(client)
+            print('Start training server')
             train_server(server_dataset['train'], server, optimizer, metric, logger, epoch)
         scheduler.step()
         model.load_state_dict(server.model_state_dict)
@@ -133,14 +136,16 @@ def train_client(batchnorm_dataset, client_dataset, server, client, optimizer, m
     for i in range(num_active_clients):
         m = client_id[i]
         dataset_m = separate_dataset(client_dataset, client[m].data_split['train'])
+        print("{}......".format(m))
         if 'batch' not in cfg['loss_mode'] and 'frgd' not in cfg['loss_mode'] and 'fmatch' not in cfg['loss_mode']:
             dataset_m = client[m].make_dataset(dataset_m, metric, logger)
         if dataset_m is not None:
             client[m].active = True
+            #print('Client {} has {} samples'.format(m, len(dataset_m[0].target[0])))
             client[m].train(dataset_m, lr, metric, logger)
         else:
             client[m].active = False
-        if i % int((num_active_clients * cfg['log_interval']) + 1) == 0:
+        if i % int((num_active_clients * cfg['log_interval']) + 1) == 0: # execute if i is multiple of 10
             _time = (time.time() - start_time) / (i + 1)
             epoch_finished_time = datetime.timedelta(seconds=_time * (num_active_clients - i - 1))
             exp_finished_time = epoch_finished_time + datetime.timedelta(

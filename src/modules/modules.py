@@ -312,6 +312,7 @@ class Client:
                 output_['target'] = torch.cat(output, dim=0)
                 input_['target'] = torch.cat(target, dim=0)
                 output_['target'] = F.softmax(output_['target'], dim=-1)
+                #print("make_dataset of client in modules.py line 315: ", output_['target'].shape)
                 _, mask = self.make_hard_pseudo_label(output_['target'])
                 output_['mask'] = mask
                 evaluation = metric.evaluate(['PAccuracy', 'MAccuracy', 'LabelRatio'], input_, output_)
@@ -411,11 +412,14 @@ class Client:
                 for i, (fix_input, mix_input) in enumerate(zip(fix_data_loader, mix_data_loader)):
                     input = {'data': fix_input['data'], 'target': fix_input['target'], 'aug': fix_input['aug'],
                              'mix_data': mix_input['data'], 'mix_target': mix_input['target']}
+                    #print("Printed in modules.py line 414 : ", input['target'])
                     input = collate(input)
+                    #print("Printed in modules.py line 417 : ", input['target'])
                     input_size = input['data'].size(0)
                     input['lam'] = self.beta.sample()[0]
                     input['mix_data'] = (input['lam'] * input['data'] + (1 - input['lam']) * input['mix_data']).detach()
                     input['mix_target'] = torch.stack([input['target'], input['mix_target']], dim=-1)
+                    #print("modules.py line 421 : ", input['mix_target'])
                     input['loss_mode'] = cfg['loss_mode']
                     input = to_device(input, cfg['device'])
                     optimizer.zero_grad()
