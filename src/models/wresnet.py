@@ -102,8 +102,9 @@ class WideResNet(nn.Module):
                 aug_output = self.f(input['aug'])
                 output['loss'] = kld_loss(aug_output, input['target'].detach())
                 mix_output = self.f(input['mix_data'])
-                output['loss'] += input['lam'] * kld_loss(mix_output, input['mix_target'][:, 0].detach()) + (
-                        1 - input['lam']) * kld_loss(mix_output, input['mix_target'][:, 1].detach())
+                #print("wresent28x2 line 105: ", mix_output.shape, input['mix_target'].shape)
+                output['loss'] += input['lam'] * kld_loss(mix_output, input['mix_target'][:, :, 0].detach()) + (
+                        1 - input['lam']) * kld_loss(mix_output, input['mix_target'][:, :, 1].detach())
             else:
                 raise ValueError('Not valid loss mode')
         else:
