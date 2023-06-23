@@ -104,7 +104,7 @@ class WideResNet(nn.Module):
                 mix_output = self.f(input['mix_data'])
                 #print("wresent28x2 line 105: ", mix_output.shape, input['mix_target'].shape)
                 output['loss'] += input['lam'] * kld_loss(mix_output, input['mix_target'][:, :, 0].detach()) + (
-                        1 - input['lam']) * kld_loss(mix_output, input['mix_target'][:, :, 1].detach())
+                        1 - input['lam']) * kld_loss(mix_output, input['mix_target'][:, :, 1].detach()) #! changed the indexing to include batches in the future
             else:
                 raise ValueError('Not valid loss mode')
         else:
