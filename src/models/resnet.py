@@ -87,29 +87,30 @@ class ResNet(nn.Module):
         output = {}
         output['target'] = self.f(input['data'])
         if 'loss_mode' in input:
-            if input['loss_mode'] == 'sup':
+            if 'sup' in input['loss_mode']:
                 output['loss'] = loss_fn(output['target'], input['target'])
-            elif input['loss_mode'] == 'fix':
+            elif 'fix' in input['loss_mode'] and 'mix' not in input['loss_mode'] and 'kd' not in input['loss_mode']:
                 aug_output = self.f(input['aug'])
                 output['loss'] = loss_fn(aug_output, input['target'].detach())
-            elif input['loss_mode'] == 'fix-mix':
+            elif 'fix' in input['loss_mode'] and 'mix' in input['loss_mode'] and 'kd' not in input['loss_mode']:
                 aug_output = self.f(input['aug'])
                 output['loss'] = loss_fn(aug_output, input['target'].detach())
                 mix_output = self.f(input['mix_data'])
                 output['loss'] += input['lam'] * loss_fn(mix_output, input['mix_target'][:, 0].detach()) + (
                         1 - input['lam']) * loss_fn(mix_output, input['mix_target'][:, 1].detach())
-            
-            elif input['loss_mode'] == 'kd':
+                
+            elif 'kd' in input['loss_mode'] and 'fix' not in input['loss_mode'] and 'mix' not in input['loss_mode']:
                 output['loss'] = kld_loss(output['target'], input['target'])
-            elif input['loss_mode'] == 'kd-fix':
+            elif 'kd' in input['loss_mode'] and 'fix' in input['loss_mode'] and 'mix' not in input['loss_mode']:
                 aug_output = self.f(input['aug'])
                 output['loss'] = kld_loss(aug_output, input['target'].detach())
-            elif input['loss_mode'] == 'kd-fix-mix':
+            elif 'kd' in input['loss_mode'] and 'fix' in input['loss_mode'] and 'mix' in input['loss_mode']:
                 aug_output = self.f(input['aug'])
                 output['loss'] = kld_loss(aug_output, input['target'].detach())
                 mix_output = self.f(input['mix_data'])
-                output['loss'] += input['lam'] * kld_loss(mix_output, input['mix_target'][:, 0].detach()) + (
-                        1 - input['lam']) * kld_loss(mix_output, input['mix_target'][:, 1].detach())
+                #print("wresent28x2 line 105: ", mix_output.shape, input['mix_target'].shape)
+                output['loss'] += input['lam'] * kld_loss(mix_output, input['mix_target'][:, :, 0].detach()) + (
+                        1 - input['lam']) * kld_loss(mix_output, input['mix_target'][:, :, 1].detach()) #! changed the indexing to include batches in the future
         else:
             if not torch.any(input['target'] == -1):
                 output['loss'] = loss_fn(output['target'], input['target'])
